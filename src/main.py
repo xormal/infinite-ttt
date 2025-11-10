@@ -10,15 +10,28 @@ functions without invoking curses. The main entry point launches the curses UI.
 
 import curses
 import random
+import time
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional
+
+# Project‑specific configuration and helper modules
+from src.config import (
+    DIFFICULTY,
+    MOVE_TIMEOUT,
+    ENABLE_POWERUPS,
+    TWO_PLAYER_MODE,
+    COLOR_PLAYER,
+    COLOR_COMPUTER,
+    COLOR_CURSOR,
+)
+from src.powerups import clear_random_line
 
 # ---------------------------------------------------------------------------
 # Constants & Directions
 # ---------------------------------------------------------------------------
 EMPTY = ' '
-PLAYER = 'X'      # Human player symbol
-COMPUTER = 'O'    # Computer player symbol
+PLAYER = 'X'      # Human player symbol (or first player in two‑player mode)
+COMPUTER = 'O'    # Computer player symbol (or second player)
 
 # Directions: horizontal, vertical, and the two diagonals
 DIRS: List[Tuple[int, int]] = [(1, 0), (0, 1), (1, 1), (1, -1)]
@@ -183,7 +196,16 @@ def computer_move(board: Dict[Tuple[int, int], str], cursor: Tuple[int, int], vi
 # ---------------------------------------------------------------------------
 # Curses UI
 # ---------------------------------------------------------------------------
-def draw(stdscr, board, cursor, offset, scores):
+def _init_colors() -> None:
+    """Initialise curses colour pairs using values from :mod:`src.config`."""
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(COLOR_PLAYER, curses.COLOR_RED, -1)
+    curses.init_pair(COLOR_COMPUTER, curses.COLOR_CYAN, -1)
+    curses.init_pair(COLOR_CURSOR, curses.COLOR_WHITE, curses.COLOR_BLUE)
+
+
+def draw(stdscr, board, cursor, offset, scores, move_history):
     """Render the board without flicker.
 
     Empty cells are shown as a period ``.``. The cell under the cursor is
@@ -196,14 +218,29 @@ def draw(stdscr, board, cursor, offset, scores):
             gx = x + offset[0]
             gy = y + offset[1]
             ch = board.get((gx, gy), EMPTY)
+            # Determine visual attributes based on cell content or cursor
             if (gx, gy) == cursor:
-                stdscr.attron(curses.A_REVERSE)
+                stdscr.attron(curses.A_REVERSE | curses.color_pair(COLOR_CURSOR))
                 stdscr.addch(y + 1, x + 1, ch if ch != EMPTY else '.')
-                stdscr.attroff(curses.A_REVERSE)
+                stdscr.attroff(curses.A_REVERSE | curses.color_pair(COLOR_CURSOR))
+            elif ch == PLAYER:
+                stdscr.attron(curses.color_pair(COLOR_PLAYER))
+                stdscr.addch(y + 1, x + 1, ch)
+                stdscr.attroff(curses.color_pair(COLOR_PLAYER))
+            elif ch == COMPUTER:
+                stdscr.attron(curses.color_pair(COLOR_COMPUTER))
+                stdscr.addch(y + 1, x + 1, ch)
+                stdscr.attroff(curses.color_pair(COLOR_COMPUTER))
             else:
-                stdscr.addch(y + 1, x + 1, ch if ch != EMPTY else '.')
+                stdscr.addch(y + 1, x + 1, '.')
     stdscr.border()
-    stdscr.addstr(0, 2, f'  X: {scores[PLAYER]}  O: {scores[COMPUTER]}  (Q – quit)  ')
+    # Build a brief move history (last 5 moves) for the status line.
+    recent = ', '.join([f"{sym}{pos}" for pos, sym in move_history[-5:]])
+    stdscr.addstr(
+        0,
+        2,
+        f' X: {scores[PLAYER]} O: {scores[COMPUTER]}  Hist: {recent}  (Q – quit) ',
+    )
     stdscr.refresh()
 
 
@@ -212,20 +249,33 @@ def main(stdscr):
     stdscr.nodelay(True)
     stdscr.keypad(True)
 
+    # Initialise colour pairs for UI rendering.
+    _init_colors()
+
     board: Dict[Tuple[int, int], str] = {}
     scores: defaultdict[str, int] = defaultdict(int)
     cursor: Tuple[int, int] = (0, 0)
     offset: Tuple[int, int] = (-10, -5)
 
+    # History of moves – each entry is ``((x, y), symbol)``.
+    move_history: List[Tuple[Tuple[int, int], str]] = []
+
+    # Symbol whose turn it is (used for two‑player mode).
+    current_symbol: str = PLAYER
+
+    # Timestamp of the most recent move (human or computer).
+    last_move_time: float = time.time()
+
     while True:
-        draw(stdscr, board, cursor, offset, scores)
+        draw(stdscr, board, cursor, offset, scores, move_history)
 
         key = stdscr.getch()
+        move_made = False
+
         if key == -1:
-            # Avoid busy‑loop when no input is available
-            curses.napms(10)
-            continue
-        if key in (ord('q'), ord('Q')):
+            # No input – fall through to timer handling.
+            pass
+        elif key in (ord('q'), ord('Q')):
             break
         elif key == curses.KEY_UP:
             cursor = (cursor[0], cursor[1] - 1)
@@ -237,26 +287,58 @@ def main(stdscr):
             cursor = (cursor[0] + 1, cursor[1])
         elif key == ord(' '):
             if cursor not in board:
-                # Human move
-                board[cursor] = PLAYER
-                # Resolve player triples
+                # Human (or player) move using the active symbol.
+                board[cursor] = current_symbol
+                move_history.append((cursor, current_symbol))
+                # Resolve any triples for the symbol just placed.
                 while True:
-                    triples = check_triples(board, PLAYER)
+                    triples = check_triples(board, current_symbol)
                     if not triples:
                         break
-                    scores[PLAYER] += len(triples)
+                    scores[current_symbol] += len(triples)
                     remove_triples(board, triples)
+                move_made = True
+                last_move_time = time.time()
 
-                # Computer move
-                comp_pos = computer_move(board, cursor)
+                if not TWO_PLAYER_MODE:
+                    # Computer response – use difficulty‑based view radius.
+                    comp_pos = computer_move(board, cursor, view_radius=DIFFICULTY.value)
+                    if comp_pos:
+                        board[comp_pos] = COMPUTER
+                        move_history.append((comp_pos, COMPUTER))
+                        while True:
+                            triples = check_triples(board, COMPUTER)
+                            if not triples:
+                                break
+                            scores[COMPUTER] += len(triples)
+                            remove_triples(board, triples)
+                        move_made = True
+                        last_move_time = time.time()
+                else:
+                    # Two‑player mode – switch turn to the opposite symbol.
+                    current_symbol = PLAYER if current_symbol == COMPUTER else COMPUTER
+        elif key == ord('p') and ENABLE_POWERUPS:
+            # Power‑up: clear a random line on the board.
+            clear_random_line(board)
+            move_made = True
+            last_move_time = time.time()
+
+        # Automatic computer move after timeout (human‑vs‑computer only).
+        if not move_made and not TWO_PLAYER_MODE and MOVE_TIMEOUT > 0:
+            now = time.time()
+            if now - last_move_time >= MOVE_TIMEOUT:
+                comp_pos = computer_move(board, cursor, view_radius=DIFFICULTY.value)
                 if comp_pos:
                     board[comp_pos] = COMPUTER
+                    move_history.append((comp_pos, COMPUTER))
                     while True:
                         triples = check_triples(board, COMPUTER)
                         if not triples:
                             break
                         scores[COMPUTER] += len(triples)
                         remove_triples(board, triples)
+                    last_move_time = now
+                    move_made = True
 
         # Auto‑scroll to keep cursor visible
         h, w = stdscr.getmaxyx()
@@ -271,7 +353,10 @@ def main(stdscr):
         elif cy - oy > h - 4:
             offset = (offset[0], cy - (h - 4))
 
+        # Avoid busy‑loop when no move occurred – give CPU a brief pause.
+        if not move_made:
+            curses.napms(10)
+
 
 if __name__ == '__main__':
     curses.wrapper(main)
-
