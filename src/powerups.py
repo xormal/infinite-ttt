@@ -9,18 +9,21 @@ from __future__ import annotations
 
 import random
 from typing import Dict, Tuple
+from src.types import Board
 
 # The board maps ``(x, y)`` coordinates to a single‑character symbol.
-Board = Dict[Tuple[int, int], str]
 
 # ---------------------------------------------------------------------------
-# Configurable range for random line generation
-# ---------------------------------------------------------------------------
-# These constants define the inclusive range of coordinates from which the
-# random line centre is chosen. Adjusting them changes the area of effect for
-# the power‑up without touching the algorithm.
-MIN_COORD: int = -10
-MAX_COORD: int = 10
+# Configurable range for random line generation – импортируем из конфигурации
+from src.config import MIN_COORD, MAX_COORD
+ 
+# Exported symbols for ``from src.powerups import *``
+__all__ = [
+    "clear_random_line",
+    "MIN_COORD",
+    "MAX_COORD",
+    "Board",
+]
 
 
 def clear_random_line(board: Board, length: int = 5) -> None:
@@ -53,4 +56,3 @@ def clear_random_line(board: Board, length: int = 5) -> None:
         x = random.randint(MIN_COORD, MAX_COORD)
         for dy in range(-half, half + 1):
             board.pop((x, dy), None)
-

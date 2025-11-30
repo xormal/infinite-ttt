@@ -10,7 +10,11 @@ from __future__ import annotations
 import socket
 import threading
 import sys
+import time
 from typing import Tuple
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class TicTacToeClient:
@@ -107,4 +111,3 @@ class TicTacToeClient:
 if __name__ == "__main__":
     client = TicTacToeClient()
     client.start()
-

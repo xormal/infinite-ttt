@@ -32,3 +32,6 @@ TWO_PLAYER_MODE: bool = False
 COLOR_PLAYER: int = 1
 COLOR_COMPUTER: int = 2
 COLOR_CURSOR: int = 3
+# Диапазон координат, используемый в power‑up "очистка линии".
+MIN_COORD: int = -10
+MAX_COORD: int = 10

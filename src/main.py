@@ -12,6 +12,7 @@ import curses
 import time
 from collections import defaultdict
 from typing import Dict, List, Tuple, Optional, Any
+from src.types import Board
 
 # Project‑specific configuration and helper modules
 from src.config import (
@@ -25,7 +26,7 @@ from src.config import (
     COLOR_CURSOR,
 )
 # Learning utilities for high difficulty AI
-from src.ai_learning import get_move_score, record_move
+from src.ai_learning import get_move_score, record_move_delta
 from src.powerups import clear_random_line
 
 # ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ DIRS: List[Tuple[int, int]] = [(1, 0), (0, 1), (1, 1), (1, -1)]
 # ---------------------------------------------------------------------------
 # Board utilities
 # ---------------------------------------------------------------------------
-def check_triples(board: Dict[Tuple[int, int], str], symbol: str) -> List[List[Tuple[int, int]]]:
+def check_triples(board: Board, symbol: str) -> List[List[Tuple[int, int]]]:
     """Return a list of coordinate triples that form a line of *symbol*.
 
     Each triple is a list of three (x, y) positions. Overlapping triples are
@@ -59,7 +60,7 @@ def check_triples(board: Dict[Tuple[int, int], str], symbol: str) -> List[List[T
     return triples
 
 
-def remove_triples(board: Dict[Tuple[int, int], str], triples: List[List[Tuple[int, int]]]) -> None:
+def remove_triples(board: Board, triples: List[List[Tuple[int, int]]]) -> None:
     """Remove all cells that belong to any triple in *triples*.
     The *board* dict is mutated in‑place.
     """
@@ -128,7 +129,7 @@ def _heuristic_score(board: Dict[Tuple[int, int], str], pos: Tuple[int, int]) ->
     return score
 
 
-def computer_move(board: Dict[Tuple[int, int], str], cursor: Tuple[int, int], view_radius: int = DIFFICULTY.value) -> Optional[Tuple[int, int]]:
+def computer_move(board: Board, cursor: Tuple[int, int], view_radius: int = DIFFICULTY.value) -> Optional[Tuple[int, int]]:
     """Choose the computer's next move.
 
     The algorithm prefers:
@@ -278,7 +279,7 @@ def main(stdscr: Any) -> None:
                                 break
                             scores[COMPUTER] += len(triples)
                             remove_triples(board, triples)
-                        record_move(comp_pos, scores[COMPUTER] > prev_score)
+                        record_move_delta(comp_pos, scores[COMPUTER] - prev_score)
                         move_made = True
                         last_move_time = time.time()
                 else:
@@ -287,6 +288,12 @@ def main(stdscr: Any) -> None:
             clear_random_line(board)
             move_made = True
             last_move_time = time.time()
+        # Обрабатываем изменение размеров терминала
+        if key == curses.KEY_RESIZE:
+            h, w = stdscr.getmaxyx()
+            curses.resizeterm(h, w)
+            continue
+
         if not move_made and not TWO_PLAYER_MODE and MOVE_TIMEOUT > 0:
             now = time.time()
             if now - last_move_time >= MOVE_TIMEOUT:
@@ -301,7 +308,7 @@ def main(stdscr: Any) -> None:
                             break
                         scores[COMPUTER] += len(triples)
                         remove_triples(board, triples)
-                    record_move(comp_pos, scores[COMPUTER] > prev_score)
+                    record_move_delta(comp_pos, scores[COMPUTER] - prev_score)
                     last_move_time = now
                     move_made = True
         h, w = stdscr.getmaxyx()
@@ -319,6 +326,12 @@ def main(stdscr: Any) -> None:
             curses.napms(10)
 
 
-if __name__ == '__main__':
-    curses.wrapper(main)
+import sys
 
+if __name__ == '__main__':
+    # Опция для полного сброса данных обучения ИИ
+    if '--reset-ai' in sys.argv:
+        from src.ai_learning import reset_learning_data
+        reset_learning_data()
+        print('AI learning data reset.')
+    curses.wrapper(main)

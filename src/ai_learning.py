@@ -12,6 +12,8 @@ added to the base heuristic in :func:`src.main.computer_move`.
 import json
 import os
 from typing import Tuple, Dict
+import threading
+_lock = threading.Lock()
 
 # Path to the persistent data file (one level above ``src``)
 DATA_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "ai_data.json")
@@ -41,8 +43,9 @@ def _save_data(data: Dict[str, int]) -> None:
         Mapping of coordinate keys to their learned scores.
     """
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-    with open(DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+    with _lock:
+        with open(DATA_PATH, "w", encoding="utf-8") as f:
+            json.dump(data, f)
 
 
 def _key(pos: Tuple[int, int]) -> str:
@@ -55,16 +58,24 @@ def _key(pos: Tuple[int, int]) -> str:
 
 
 def record_move(pos: Tuple[int, int], success: bool) -> None:
-    """Update the learning data for a computer move.
+    """Legacy API: update score by ``+1`` or ``-1``.
 
-    * ``pos`` – board coordinate of the move.
-    * ``success`` – ``True`` if the move resulted in at least one triple for
-      the computer (i.e., a positive outcome), otherwise ``False``.
+    New code should use :func:`record_move_delta` for a precise delta.
+    """
+    delta = 1 if success else -1
+    record_move_delta(pos, delta)
+
+
+def record_move_delta(pos: Tuple[int, int], delta: int) -> None:
+    """Update learning data by an arbitrary ``delta``.
+
+    Allows the AI to record the exact impact of a move (e.g., number of
+    triples created). ``delta`` may be positive, negative, or zero.
     """
     data = _load_data()
     k = _key(pos)
     data.setdefault(k, 0)
-    data[k] += 1 if success else -1
+    data[k] += delta
     _save_data(data)
 
 
@@ -73,4 +84,9 @@ def get_move_score(pos: Tuple[int, int]) -> int:
     return _load_data().get(_key(pos), 0)
 
 # Public API of this module
-__all__ = ["record_move", "get_move_score"]
+__all__ = ["record_move", "get_move_score", "record_move_delta", "reset_learning_data"]
+def reset_learning_data() -> None:
+    """Очистить накопленные AI‑данные и сбросить кэш."""
+    global _cache
+    _cache = {}
+    _save_data({})
