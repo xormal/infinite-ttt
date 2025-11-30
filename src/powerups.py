@@ -1,8 +1,8 @@
 """Power‑up utilities for Infinite Tic‑Tac‑Toe.
 
-Currently provides a single power‑up that clears a random line (row or column)
-of a configurable length from the board. The function mutates the ``board``
-dictionary in‑place.
+Provides a single power‑up that clears a random line (row or column) of a
+configurable length from the board. The board is a ``dict`` mapping ``(x, y)``
+coordinates to a single‑character symbol.
 """
 
 from __future__ import annotations
@@ -12,6 +12,15 @@ from typing import Dict, Tuple
 
 # The board maps ``(x, y)`` coordinates to a single‑character symbol.
 Board = Dict[Tuple[int, int], str]
+
+# ---------------------------------------------------------------------------
+# Configurable range for random line generation
+# ---------------------------------------------------------------------------
+# These constants define the inclusive range of coordinates from which the
+# random line centre is chosen. Adjusting them changes the area of effect for
+# the power‑up without touching the algorithm.
+MIN_COORD: int = -10
+MAX_COORD: int = 10
 
 
 def clear_random_line(board: Board, length: int = 5) -> None:
@@ -37,14 +46,11 @@ def clear_random_line(board: Board, length: int = 5) -> None:
     half = length // 2
 
     if orientation == "horizontal":
-        # Choose a random y coordinate within a modest range to keep the board
-        # reasonably sized; the exact range is arbitrary but should cover most
-        # active play areas.
-        y = random.randint(-10, 10)
+        y = random.randint(MIN_COORD, MAX_COORD)
         for dx in range(-half, half + 1):
             board.pop((dx, y), None)
     else:  # vertical
-        x = random.randint(-10, 10)
+        x = random.randint(MIN_COORD, MAX_COORD)
         for dy in range(-half, half + 1):
             board.pop((x, dy), None)
 

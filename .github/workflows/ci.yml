@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest flake8 black
+
+      - name: Run unit tests
+        run: |
+          . .venv/bin/activate
+          pytest -q
+      - name: Run linting (flake8)
+        run: |
+          . .venv/bin/activate
+          flake8 src tests
+      - name: Check formatting (black --check)
+        run: |
+          . .venv/bin/activate
+          black --check src tests
+
+      - name: Build Docker image
+        run: |
+          docker compose build
+
+      - name: Run Docker container healthcheck
+        run: |
+          docker compose up -d
+          # Wait for health status
+          timeout 30s bash -c "while [[ $(docker inspect -f '{{.State.Health.Status}}' network_server) != 'healthy' ]]; do sleep 1; done"
+          docker compose down

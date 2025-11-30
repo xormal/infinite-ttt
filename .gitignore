@@ -1,68 +1,24 @@
-# Byte-compiled / optimized / DLL files
+# Python cache files
 __pycache__/
 *.py[cod]
-$py.class
 
-# C extensions
-*.so
-
-# Distribution / packaging
-*.egg-info/
-dist/
-build/
-*.egg
-*.whl
-pip-wheel-metadata/
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-
-# pyenv
-.python-version
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# Virtual environments
-venv/
+# Virtual environment
 .venv/
+venv/
 ENV/
-env/
-env.bak/
 
-# IDE / editor folders
+# IDE/editor files
 .idea/
 .vscode/
-*.sublime-project
-*.sublime-workspace
+*.swp
+*.swo
 
+# OS files
+.DS_Store
+
+# Build artifacts
+build/
+dist/
+
+# Logs
+*.log

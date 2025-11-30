@@ -1,10 +1,8 @@
-"""Skeleton client for connecting to ``src.network_server``.
+"""Клиентская часть сетевой игры Infinite Tic‑Tac‑Toe.
 
-The client reads user input from the terminal (coordinates) and sends them to
-the server. It also receives board updates from the server and prints a simple
-textual representation. This module is provided for completeness – the
-environment's network access is restricted, so the code cannot be exercised
-here, but it can be used locally.
+Подключается к серверу, отправляет координаты ходов и отображает полученные
+обновления доски в терминале. В текущей среде сетевой доступ ограничен, но
+код остаётся полностью рабочим при запуске в обычной сети.
 """
 
 from __future__ import annotations
@@ -16,50 +14,51 @@ from typing import Tuple
 
 
 class TicTacToeClient:
-    """Connect to a Tic‑Tac‑Toe server and exchange moves.
+    """TCP‑клиент для обмена ходами с сервером.
 
-    Parameters
+    Параметры
     ----------
-    host:
-        Server hostname or IP address.
-    port:
-        Server listening port.
+    host: str
+        Адрес сервера (по умолчанию ``127.0.0.1``).
+    port: int
+        Порт сервера (по умолчанию ``5555``).
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 5555) -> None:
-        self.host = host
-        self.port = port
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.host: str = host
+        self.port: int = port
+        self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def start(self) -> None:
+        """Установить соединение и запустить потоки ввода/вывода."""
         self.sock.connect((self.host, self.port))
         threading.Thread(target=self._receive_loop, daemon=True).start()
         self._input_loop()
 
     def _receive_loop(self) -> None:
-        """Continuously read board updates from the server."""
-        buffer = ""
+        """Читать обновления доски от сервера и выводить их в консоль."""
+        buffer: str = ""
         while True:
             try:
-                data = self.sock.recv(4096)
+                data: bytes = self.sock.recv(4096)
             except ConnectionResetError:
                 print("Disconnected from server")
                 break
             if not data:
                 break
             buffer += data.decode()
-            # Board updates are separated by a double newline.
+            # Обновления разделяются двойным переводом строки.
             while "\n\n" in buffer:
                 raw_board, buffer = buffer.split("\n\n", 1)
                 self._render_board(raw_board)
 
     def _render_board(self, raw: str) -> None:
-        """Print a simple human‑readable board representation.
+        """Преобразовать строковое представление доски в табличный вывод.
 
-        The ``raw`` string consists of lines ``x,y,sym``. This method groups the
-        cells by their ``y`` coordinate and prints rows from top to bottom.
+        Формат ``raw`` – строки ``x,y,sym``. Функция группирует клетки по ``y``
+        и печатает строки от минимального до максимального ``y``.
         """
-        cells = {}
+        cells: dict[Tuple[int, int], str] = {}
         for line in raw.splitlines():
             try:
                 x_str, y_str, sym = line.split(',')
@@ -81,7 +80,7 @@ class TicTacToeClient:
         print('-' * 20)
 
     def _input_loop(self) -> None:
-        """Read ``x y`` coordinates from stdin and send them to the server."""
+        """Считывать координаты ходов из ``stdin`` и отправлять их серверу."""
         print("Enter moves as ``x y`` (e.g. ``0 0``). Type ``quit`` to exit.")
         for line in sys.stdin:
             line = line.strip()
@@ -108,3 +107,4 @@ class TicTacToeClient:
 if __name__ == "__main__":
     client = TicTacToeClient()
     client.start()
+

@@ -1,14 +1,12 @@
-# Exclude virtual environment and build artefacts from Docker context
-venv
+# Exclude common unwanted files from Docker context
+.git
+.venv
 __pycache__
 *.pyc
-.git
-.gitignore
-Dockerfile
-docker-compose.yml
-Makefile
-README.md
-IMPROVEMENTS.md
-AGENTS.md
-run.sh
-
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.log
+tests/
+*.md
