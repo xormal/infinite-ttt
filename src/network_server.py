@@ -12,6 +12,9 @@ import os
 import socket
 import threading
 from typing import Dict, Tuple, List
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 # Тип доски – словарь координат → символ.
 Board = Dict[Tuple[int, int], str]
@@ -33,18 +36,26 @@ class TicTacToeServer:
         self.lock = threading.Lock()
 
     def start(self) -> None:
-        """Создать слушающий сокет и принимать подключения в бесконечном цикле."""
+        """Создать слушающий сокет и принимать подключения в бесконечном цикле.
+
+        Добавлена обработка KeyboardInterrupt и гарантированное закрытие сокета.
+        """
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind((self.host, self.port))
         srv.listen()
-        print(f"Tic‑Tac‑Toe server listening on {self.host}:{self.port}")
-        while True:
-            client, addr = srv.accept()
-            print(f"Client connected from {addr}")
-            with self.lock:
-                self.clients.append(client)
-            threading.Thread(target=self._handle_client, args=(client,), daemon=True).start()
+        logger.info(f"Tic‑Tac‑Toe server listening on {self.host}:{self.port}")
+        try:
+            while True:
+                client, addr = srv.accept()
+                logger.info(f"Client connected from {addr}")
+                with self.lock:
+                    self.clients.append(client)
+                threading.Thread(target=self._handle_client, args=(client,), daemon=True).start()
+        except KeyboardInterrupt:
+            logger.info("Server shutdown requested via KeyboardInterrupt")
+        finally:
+            srv.close()
 
     def _handle_client(self, conn: socket.socket) -> None:
         """Обрабатывать сообщения от одного клиента.
@@ -58,6 +69,10 @@ class TicTacToeServer:
                 try:
                     data = conn.recv(1024)
                 except ConnectionResetError:
+                    logger.warning("Client connection reset")
+                    break
+                except Exception as e:
+                    logger.error(f"Unexpected error in client handler: {e}")
                     break
                 if not data:
                     break

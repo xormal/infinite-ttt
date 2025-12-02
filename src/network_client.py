@@ -34,8 +34,16 @@ class TicTacToeClient:
         self.sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def start(self) -> None:
-        """Установить соединение и запустить потоки ввода/вывода."""
-        self.sock.connect((self.host, self.port))
+        """Установить соединение и запустить потоки ввода/вывода.
+
+        Добавлена обработка ошибок соединения: при неудаче логируется ошибка
+        и клиент завершает работу без исключения.
+        """
+        try:
+            self.sock.connect((self.host, self.port))
+        except Exception as e:
+            logger.error(f"Failed to connect to server {self.host}:{self.port}: {e}")
+            return
         threading.Thread(target=self._receive_loop, daemon=True).start()
         self._input_loop()
 
@@ -46,7 +54,7 @@ class TicTacToeClient:
             try:
                 data: bytes = self.sock.recv(4096)
             except ConnectionResetError:
-                print("Disconnected from server")
+                logger.warning("Disconnected from server")
                 break
             if not data:
                 break
@@ -69,6 +77,7 @@ class TicTacToeClient:
                 x, y = int(x_str), int(y_str)
                 cells[(x, y)] = sym
             except ValueError:
+                logger.debug(f"Skipping malformed line: {line}")
                 continue
         if not cells:
             return
@@ -80,30 +89,30 @@ class TicTacToeClient:
             row = []
             for x in range(min_x, max_x + 1):
                 row.append(cells.get((x, y), '.'))
-            print(''.join(row))
-        print('-' * 20)
+            logger.info(''.join(row))
+        logger.info('-' * 20)
 
     def _input_loop(self) -> None:
         """Считывать координаты ходов из ``stdin`` и отправлять их серверу."""
-        print("Enter moves as ``x y`` (e.g. ``0 0``). Type ``quit`` to exit.")
+        logger.info("Enter moves as ``x y`` (e.g. ``0 0``). Type ``quit`` to exit.")
         for line in sys.stdin:
             line = line.strip()
             if line.lower() in {"quit", "exit", "q"}:
                 break
             parts = line.split()
             if len(parts) != 2:
-                print("Invalid input – provide two integers")
+                logger.warning("Invalid input – provide two integers")
                 continue
             try:
                 x, y = int(parts[0]), int(parts[1])
             except ValueError:
-                print("Coordinates must be integers")
+                logger.warning("Coordinates must be integers")
                 continue
             msg = f"{x},{y}".encode()
             try:
                 self.sock.sendall(msg)
             except Exception:
-                print("Failed to send move – connection may be closed")
+                logger.error("Failed to send move – connection may be closed")
                 break
         self.sock.close()
 
