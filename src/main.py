@@ -247,15 +247,15 @@ def main(stdscr: Any) -> None:
             pass
         elif key in (ord('q'), ord('Q')):
             break
-        elif key == curses.KEY_UP:
+        elif key == curses.KEY_UP or key == ord('w'):
             cursor = (cursor[0], cursor[1] - 1)
-        elif key == curses.KEY_DOWN:
+        elif key == curses.KEY_DOWN or key == ord('s'):
             cursor = (cursor[0], cursor[1] + 1)
-        elif key == curses.KEY_LEFT:
+        elif key == curses.KEY_LEFT or key == ord('a'):
             cursor = (cursor[0] - 1, cursor[1])
-        elif key == curses.KEY_RIGHT:
+        elif key == curses.KEY_RIGHT or key == ord('d'):
             cursor = (cursor[0] + 1, cursor[1])
-        elif key == ord(' '):
+        elif key == ord(' ') or key in (curses.KEY_ENTER, 10, 13):
             if cursor not in board:
                 board[cursor] = current_symbol
                 move_history.append((cursor, current_symbol))

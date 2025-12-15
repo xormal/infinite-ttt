@@ -12,10 +12,18 @@ from src.main import main as game_main
 
 
 def _run() -> None:
-    """Run the game inside a curses session."""
-    curses.wrapper(game_main)
+    """Запускает игру в сессии curses.
+
+    В неинтерактивных средах (например, CI или без терминала) ``curses``
+    может выбросить ``curses.error``. В этом случае выводим короткое пояснение
+    вместо аварийного завершения.
+    """
+    try:
+        curses.wrapper(game_main)
+    except curses.error:
+        # Аккуратное завершение, если терминал недоступен
+        print('В этой среде интерфейс curses недоступен.')
 
 
 if __name__ == "__main__":
     _run()
-
